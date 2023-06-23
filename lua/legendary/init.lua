@@ -117,6 +117,11 @@ function M.find(opts)
   Ui.select(opts)
 end
 
+function M.repeat_()
+  lazy_load_stuff()
+  Ui.repeat_()
+end
+
 ---@diagnostic disable: undefined-doc-param
 -- disable undefined-doc-param since we're dynamically generating these functions
 -- but I still want them to be annotated

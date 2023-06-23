@@ -43,7 +43,7 @@ local M = {}
 ---@param itemlist ItemList
 ---@param context LegendaryEditorContext
 ---@overload fun(opts:LegendaryFindOpts,context:LegendaryEditorContext)
-local function select_inner(opts, context, itemlist)
+local function select_inner(opts, context, itemlist, repeat_)
   if itemlist then
     Log.trace('Relaunching select UI for an item group')
   else
@@ -79,20 +79,16 @@ local function select_inner(opts, context, itemlist)
   local items = itemlist:filter(filters, context)
   local padding = Format.compute_padding(items, opts.formatter or Config.default_item_formatter, context.mode)
 
-  vim.ui.select(items, {
-    prompt = prompt,
-    kind = 'legendary.nvim',
-    format_item = function(item)
-      return Format.format_item(item, opts.formatter or Config.default_item_formatter, padding, context.mode)
-    end,
-  }, function(selected)
+  local execute = function(selected)
     if not selected then
       return
     end
 
-    local ok, err = pcall(update_item_frecency_score, selected)
-    if not ok then
-      Log.error('Failed to update frecency score: %s', err)
+    if not repeat_ then
+      local ok, err = pcall(update_item_frecency_score, selected)
+      if not ok then
+        Log.error('Failed to update frecency score: %s', err)
+      end
     end
 
     State.most_recent_item = selected
@@ -102,7 +98,22 @@ local function select_inner(opts, context, itemlist)
 
     Log.trace('Preparing to execute selected item')
     Executor.exec_item(selected, context)
-  end)
+  end
+
+  if repeat_ then
+    if vim.tbl_contains(items, State.most_recent_item) then
+      execute(State.most_recent_item)
+    end
+
+  else
+    vim.ui.select(items, {
+      prompt = prompt,
+      kind = 'legendary.nvim',
+      format_item = function(item)
+        return Format.format_item(item, opts.formatter or Config.default_item_formatter, padding, context.mode)
+      end,
+    }, execute)
+  end
 end
 
 ---Select an item
@@ -111,6 +122,10 @@ function M.select(opts)
   vim.cmd('doautocmd User LegendaryUiPre')
   local context = Executor.build_context()
   select_inner(opts, context)
+end
+
+function M.repeat_(opts)
+  select_inner(opts, Executor.build_context(), nil, true)
 end
 
 return M
